@@ -7,7 +7,7 @@
 
         Title="Amazon Redeemer"
         Height="600"
-        Width="1190">
+        Width="1204">
     <DockPanel Margin="10">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
             <StackPanel>

@@ -160,7 +160,19 @@ namespace AmazonRedeemer
 
             AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionTrapper;
 
+
+            if (WebCore.IsInitialized == false)
+            {
+                WebCore.Initialize(new WebConfig
+                {
+                    LogLevel = LogLevel.None,
+                });
+            }
+           
+
             InitializeComponent();
+
+            browser.WebSession = WebCore.CreateWebSession(new WebPreferences() { Plugins = false });
 
             datagridParsedAmazonCodes.ItemsSource = colParsedAmazonGiftCodes;
 
@@ -236,8 +248,12 @@ namespace AmazonRedeemer
 
         private async void btnRedeem_Click(object sender, RoutedEventArgs e)
         {
+           
             browser.WebSession.ClearCache();
             browser.WebSession.ClearCookies();
+
+          
+
             btnRedeem.IsEnabled = false;
 
             await browser.WaitPageLoadComplete(() =>

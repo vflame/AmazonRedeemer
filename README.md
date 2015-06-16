@@ -1,6 +1,6 @@
 # AmazonRedeemer
 
-Download the latest release: https://github.com/vflame/AmazonRedeemer/releases
+Download the latest release (AmazonRedeemer.7z): https://github.com/vflame/AmazonRedeemer/releases
 
 Run the amazonredeemer.exe (has amazon icon)
 

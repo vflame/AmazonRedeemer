@@ -30,7 +30,7 @@ namespace AmazonRedeemer
         public static async Task<decimal> AuthenticateAmazonAsync(this IWebView view, string username, string password, CancellationToken ct)
         {
 
-            string amazonLoginUrl = @"https://www.amazon.com/gp/css/gc/payment/view-gc-balance";
+            string amazonLoginUrl = @"https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
 
             await view.WaitPageLoadComplete(() =>
             {
@@ -49,7 +49,7 @@ namespace AmazonRedeemer
             {
                 await Task.Delay(1000, ct);
                 ct.ThrowIfCancellationRequested();
-                if (view.Source.ToString().Contains("view-gc-balance"))
+                if (view.Source.ToString().Contains("/redeem/"))
                 {
                     break;
                 }
@@ -63,7 +63,7 @@ namespace AmazonRedeemer
         {
             decimal balance = -1;
             string amazonBalance = "";
-            string amazonBalanceUrl = "https://www.amazon.com/gp/css/gc/payment/view-gc-balance";
+            string amazonBalanceUrl = "https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
             if (view.Source.ToString().Contains(amazonBalanceUrl) == false)
             {
                 await view.WaitPageLoadComplete(() =>
@@ -72,7 +72,7 @@ namespace AmazonRedeemer
                 });
             }
 
-            amazonBalance = view.ExecuteJavascriptWithResult("document.querySelector(\".gcBalanceAmt\").innerHTML").ToString();
+            amazonBalance = view.ExecuteJavascriptWithResult("document.querySelector(\"#gc-current-balance\").innerHTML").ToString();
 
             decimal.TryParse(amazonBalance.Replace("$", ""), out balance);
 
@@ -85,7 +85,7 @@ namespace AmazonRedeemer
 
         public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct)
         {
-            string amazonCashInUrl = "https://www.amazon.com/gp/css/gc/payment/view-gc-balance";
+            string amazonCashInUrl = "https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
 
             if (view.Source != amazonCashInUrl.ToUri())
             {
@@ -95,11 +95,12 @@ namespace AmazonRedeemer
                 }, ct: ct);
             }
 
-            view.ExecuteJavascript(string.Format("document.querySelector(\"#claimCodeInput\").value=\"{0}\"", claimcode));
+            view.ExecuteJavascript(string.Format("document.querySelector(\"#gc-redemption-input\").value=\"{0}\"", claimcode));
 
             await view.WaitPageLoadComplete(() =>
             {
-                view.ExecuteJavascript("document.querySelector(\"input[name=applytoaccount]\").click()");
+                //view.ExecuteJavascript("document.querySelector(\"input[name=applytoaccount]\").click()");
+                view.ExecuteJavascript("document.querySelector(\"#gc-redemption-apply input\").click()");
             }, ct: ct);
 
 
@@ -168,17 +169,18 @@ namespace AmazonRedeemer
                     LogLevel = LogLevel.None,
                 });
             }
-           
+
 
             InitializeComponent();
 
-            browser.WebSession = WebCore.CreateWebSession(new WebPreferences() { Plugins = false });
+            //browser.WebSession = WebCore.CreateWebSession(new WebPreferences() { Plugins = false });
 
             datagridParsedAmazonCodes.ItemsSource = colParsedAmazonGiftCodes;
 
 
         }
 
+        Awesomium.Windows.Controls.WebControl browser;
 
         private void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)
         {
@@ -246,13 +248,38 @@ namespace AmazonRedeemer
 
         }
 
+        public static readonly string ValidIpAddressRegex = @"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+
+
         private async void btnRedeem_Click(object sender, RoutedEventArgs e)
         {
-           
-            browser.WebSession.ClearCache();
-            browser.WebSession.ClearCookies();
+            browserPlaceHolder.Children.Clear();
+            browser = new Awesomium.Windows.Controls.WebControl();
+            browser.Height = 508;
+            browser.Width = 508;
+            
 
+            browserPlaceHolder.Children.Add(browser);
+            
           
+
+            if (cbUseSSHProxy.IsChecked == true)
+            {
+                browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
+                {
+                    Plugins = false,
+                    ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
+                });
+
+                await browser.WaitPageLoadComplete(() =>
+                {
+                    browser.Source = "api.ipify.org".ToUri();
+                });
+
+                string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
+
+                MessageBox.Show(string.Format("Proxy IP: {0}", ip));
+            }
 
             btnRedeem.IsEnabled = false;
 

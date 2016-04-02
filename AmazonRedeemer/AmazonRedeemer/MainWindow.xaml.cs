@@ -1,4 +1,5 @@
-﻿using Awesomium;
+﻿using System.Web;
+using Awesomium;
 using Awesomium.Core;
 using System.Threading;
 using System;
@@ -27,35 +28,53 @@ namespace AmazonRedeemer
     public static class Extensions
     {
 
-        public static async Task<decimal> AuthenticateAmazonAsync(this IWebView view, string username, string password, CancellationToken ct)
+        public static async Task<decimal> AuthenticateToAmazonAsync(this IWebView view, string username, string password, CancellationToken ct)
         {
-
-            string amazonLoginUrl = @"https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
-
-            await view.WaitPageLoadComplete(() =>
+            string amazonLoginUrl = @"https://www.amazon.com/gc/redeem/";
+            if (view.Source == null)
             {
-                view.Source = amazonLoginUrl.ToUri();
-            }, ct: ct);
-
-            view.ExecuteJavascript(string.Format("document.querySelector(\"#ap_email\").value=\"{0}\"", username));
-            view.ExecuteJavascript(string.Format("document.querySelector(\"#ap_password\").value=\"{0}\"", password));
-
-            await view.WaitPageLoadComplete(() =>
-            {
-                view.ExecuteJavascript("document.querySelector(\"#signInSubmit-input\").click()");
-            });
-
-            while (true)
-            {
-                await Task.Delay(1000, ct);
-                ct.ThrowIfCancellationRequested();
-                if (view.Source.ToString().Contains("/redeem/"))
+                await view.WaitPageLoadComplete(() =>
                 {
-                    break;
+                    view.Source = amazonLoginUrl.ToUri();
+                }, ct: ct);
+            }
+
+
+            
+            if (view.Source.ToString().ToLower() != amazonLoginUrl)
+            {
+                await view.WaitPageLoadComplete(() =>
+                {
+                    view.Source = amazonLoginUrl.ToUri();
+                }, ct: ct);
+            }
+            else
+            {
+                view.Reload(true);
+            }
+
+            if (view.Source.ToString().ToLower().Contains("signin"))
+            {
+                view.ExecuteJavascript(string.Format("document.querySelector(\"#ap_email\").value=\"{0}\"", username));
+                view.ExecuteJavascript(string.Format("document.querySelector(\"#ap_password\").value=\"{0}\"", password));
+
+                await view.WaitPageLoadComplete(() =>
+                {
+                    view.ExecuteJavascript("document.querySelector(\"#signInSubmit-input\").click()");
+                }, 10);
+
+                while (true)
+                {
+                    await Task.Delay(250, ct);
+                    ct.ThrowIfCancellationRequested();
+                    if (view.Source.ToString().ToLower().Contains("/redeem/"))
+                    {
+                        break;
+                    }
                 }
             }
 
-            return (await view.GetAmazonBalanceAsync());
+            return await view.GetAmazonBalanceAsync();
 
         }
 
@@ -63,8 +82,8 @@ namespace AmazonRedeemer
         {
             decimal balance = -1;
             string amazonBalance = "";
-            string amazonBalanceUrl = "https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
-            if (view.Source.ToString().Contains(amazonBalanceUrl) == false)
+            string amazonBalanceUrl = "https://www.amazon.com/gc/redeem/";
+            if (view.Source.ToString().ToLower().Contains(amazonBalanceUrl) == false)
             {
                 await view.WaitPageLoadComplete(() =>
                 {
@@ -72,7 +91,7 @@ namespace AmazonRedeemer
                 });
             }
 
-            amazonBalance = view.ExecuteJavascriptWithResult("document.querySelector(\"#gc-current-balance\").innerHTML").ToString();
+            amazonBalance = view.ExecuteJavascriptWithResult("document.querySelector('#gc-current-balance').innerHTML").ToString();
 
             decimal.TryParse(amazonBalance.Replace("$", ""), out balance);
 
@@ -83,25 +102,176 @@ namespace AmazonRedeemer
 
         }
 
-        public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct)
-        {
-            string amazonCashInUrl = "https://www.amazon.com/gc/redeem/ref=gc_redeem_new_exp";
 
-            if (view.Source != amazonCashInUrl.ToUri())
+
+        public static async Task<decimal> ValidateAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct)
+        {
+            string amazonValidateInUrl = "https://www.amazon.com/gc/redeem/";
+
+            if (view.Source.ToString().ToLower().Contains(amazonValidateInUrl) == false)
+            {
+                await view.WaitPageLoadComplete(() =>
+                {
+                    view.Source = amazonValidateInUrl.ToUri();
+                }, ct: ct);
+            }
+
+            await view.WaitPageLoadComplete(() =>
+            {
+                view.Reload(false);
+            }, ct: ct);
+
+
+            view.ExecuteJavascript(string.Format("document.querySelector('#gc-redemption-input').value='{0}'", claimcode));
+
+            await Task.Delay(250);
+
+
+            view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
+
+            int milliSecToWait = 10000;
+            int milliSecWaited = 0;
+
+
+            string gcValue;
+            bool codeError = false;
+            bool captchaError = false;
+            decimal parsedValue = -1;
+
+            while (true)
+            {
+                if (milliSecWaited > milliSecToWait)
+                {
+                    break;
+                }
+                await Task.Delay(500);
+                milliSecWaited += 500;
+
+
+                gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
+                codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
+                captchaError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-captcha') ? (document.querySelector('#gc-redemption-captcha').innerHTML.toLowerCase().indexOf('security verification')>-1 ? true : false) : false").ToString());
+
+                if (codeError)
+                {
+                    break;
+                }
+
+                if (captchaError)
+                {
+
+                   // Application.Current.MainWindow.Dispatcher.Invoke(() => { MessageBox.Show("Captcha Detected. Enter Captcha and manually click 'check'."); });
+                    Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = "Captcha Detected. Enter Captcha and manually click 'check'."; });
+
+                    while (true)
+                    {
+                        await Task.Delay(2000);
+                        gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
+                        codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
+                        if (codeError)
+                        {
+                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = ""; });
+                            return parsedValue;
+                        }
+
+
+                        if (gcValue == null || gcValue == "undefined" || gcValue == "null" || gcValue == "")
+                        {
+                            continue;
+
+                        }
+
+                        string gcParsedClaimCode = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-result-box span').innerHTML").ToString()).Split()[2].ToLower();
+
+                        if (gcParsedClaimCode == claimcode.Replace("-", "").ToLower())
+                        {
+                            decimal.TryParse(gcValue.Split()[0].Replace("$", ""), out parsedValue);
+                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = ""; });
+                            return parsedValue;
+
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+
+
+                }
+
+
+                if (gcValue == null || gcValue == "undefined" || gcValue == "null" || gcValue == "")
+                {
+                    continue;
+
+                }
+
+
+                else
+                {
+
+
+                    gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
+
+                    string gcParsedClaimCode = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-result-box span').innerHTML").ToString()).Split()[2].ToLower();
+
+                    if (gcParsedClaimCode == claimcode.Replace("-", "").ToLower())
+                    {
+                        decimal.TryParse(gcValue.Split()[0].Replace("$", ""), out parsedValue);
+                        return parsedValue;
+
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+
+
+
+                }
+
+
+
+
+
+            }
+
+
+
+            return parsedValue;
+        }
+
+
+
+        public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string claimcode, CancellationToken ct)
+        {
+            string amazonCashInUrl = "https://www.amazon.com/gc/redeem/";
+
+            if (view.Source.ToString().ToLower().Contains(amazonCashInUrl) == false)
             {
                 await view.WaitPageLoadComplete(() =>
                 {
                     view.Source = amazonCashInUrl.ToUri();
                 }, ct: ct);
             }
+            else
+            {
+                await view.WaitPageLoadComplete(() =>
+                {
+                    view.Reload(false);
+                }, ct: ct);
+            
+        }
 
-            view.ExecuteJavascript(string.Format("document.querySelector(\"#gc-redemption-input\").value=\"{0}\"", claimcode));
+            view.ExecuteJavascript(string.Format("document.querySelector('#gc-redemption-input').value='{0}'", claimcode));
 
             await view.WaitPageLoadComplete(() =>
             {
                 //view.ExecuteJavascript("document.querySelector(\"input[name=applytoaccount]\").click()");
                 view.ExecuteJavascript("document.querySelector(\"#gc-redemption-apply input\").click()");
             }, ct: ct);
+
 
 
 
@@ -154,7 +324,7 @@ namespace AmazonRedeemer
 
         public TrulyObservableCollection<AmazonGiftCode> colParsedAmazonGiftCodes = new TrulyObservableCollection<AmazonGiftCode>();
 
-        CancellationTokenSource CTSRedeem;
+        CancellationTokenSource CTSRedeemAmazon;
 
         public MainWindow()
         {
@@ -251,17 +421,18 @@ namespace AmazonRedeemer
         public static readonly string ValidIpAddressRegex = @"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
 
 
+
         private async void btnRedeem_Click(object sender, RoutedEventArgs e)
         {
             browserPlaceHolder.Children.Clear();
             browser = new Awesomium.Windows.Controls.WebControl();
-            browser.Height = 508;
-            browser.Width = 508;
-            
+            browser.Height = browserPlaceHolder.Height;
+            browser.Width = browserPlaceHolder.Width;
+
 
             browserPlaceHolder.Children.Add(browser);
-            
-          
+
+
 
             if (cbUseSSHProxy.IsChecked == true)
             {
@@ -282,17 +453,18 @@ namespace AmazonRedeemer
             }
 
             btnRedeem.IsEnabled = false;
+            btnValidate.IsEnabled = false;
 
-            await browser.WaitPageLoadComplete(() =>
-            {
-                browser.Source = "amazon.com".ToUri();
-            });
+            //await browser.WaitPageLoadComplete(() =>
+            //{
+            //    browser.Source = "amazon.com".ToUri();
+            //});
 
 
 
 
-            CTSRedeem = new CancellationTokenSource();
-            decimal currentBalance = await browser.AuthenticateAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeem.Token);
+            CTSRedeemAmazon = new CancellationTokenSource();
+            decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
 
 
 
@@ -310,25 +482,33 @@ namespace AmazonRedeemer
 
                 foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
                 {
-                    gcCount++;
-
-
-                    currentBalance = await browser.RedeemAmazonAsync(txtUsername.Text, txtPassword.Password, gc.Code, CTSRedeem.Token);
-
-                    lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
-
-                    if (currentBalance > previousBalance)
+                    try
                     {
-                        gc.Redeemed = true;
-                        gc.Value = (currentBalance - previousBalance);
-                        previousBalance = currentBalance;
+                        gcCount++;
+
+
+                        currentBalance = await browser.RedeemAmazonAsync(gc.Code, CTSRedeemAmazon.Token);
+
+                        lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
+
+                        if (currentBalance > previousBalance)
+                        {
+                            gc.Redeemed = true;
+                            gc.Validated = true;
+                            gc.Value = (currentBalance - previousBalance);
+                            previousBalance = currentBalance;
 
 
 
+                        }
+                        else
+                        {
+                            gc.Redeemed = false;
+
+                        }
                     }
-                    else
+                    catch (OperationCanceledException ex)
                     {
-                        gc.Redeemed = false;
 
                     }
 
@@ -372,6 +552,7 @@ namespace AmazonRedeemer
             private int _id;
             private bool? _redeemed = null;
             private decimal? _value;
+            private bool? _validated = null;
             public AmazonGiftCode(int id, string code, decimal? value)
             {
                 _id = id;
@@ -425,6 +606,21 @@ namespace AmazonRedeemer
                     NotifyPropertyChanged("Value");
                 }
             }
+
+            public bool? Validated
+            {
+                get
+                {
+                    return _validated;
+                }
+
+                set
+                {
+                    _validated = value;
+                    NotifyPropertyChanged("Validated");
+                }
+            }
+
             private void NotifyPropertyChanged(String propertyName = "")
             {
                 if (PropertyChanged != null)
@@ -436,8 +632,7 @@ namespace AmazonRedeemer
 
         }
 
-        public sealed class TrulyObservableCollection<T> : ObservableCollection<T>
-    where T : INotifyPropertyChanged
+        public sealed class TrulyObservableCollection<T> : ObservableCollection<T> where T : INotifyPropertyChanged
         {
             public TrulyObservableCollection()
             {
@@ -467,6 +662,116 @@ namespace AmazonRedeemer
                 NotifyCollectionChangedEventArgs args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, sender, sender, IndexOf((T)sender));
                 OnCollectionChanged(args);
             }
+        }
+
+        private async void btnValidate_Click(object sender, RoutedEventArgs e)
+        {
+            browserPlaceHolder.Children.Clear();
+            browser = new Awesomium.Windows.Controls.WebControl();
+            browser.Height = browserPlaceHolder.Height;
+            browser.Width = browserPlaceHolder.Width;
+
+
+            browserPlaceHolder.Children.Add(browser);
+
+
+
+            if (cbUseSSHProxy.IsChecked == true)
+            {
+                browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
+                {
+                    Plugins = false,
+                    ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
+                });
+
+                await browser.WaitPageLoadComplete(() =>
+                {
+                    browser.Source = "api.ipify.org".ToUri();
+                });
+
+                string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
+
+                MessageBox.Show(string.Format("Proxy IP: {0}", ip));
+            }
+
+            btnValidate.IsEnabled = false;
+            btnRedeem.IsEnabled = false;
+
+            //await browser.WaitPageLoadComplete(() =>
+            //{
+            //    browser.Source = "amazon.com".ToUri();
+            //});
+
+
+
+
+            CTSRedeemAmazon = new CancellationTokenSource();
+            decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
+
+
+
+            if (currentBalance > -1)
+            {
+
+                lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
+
+                int gcCount = 0;
+
+
+                decimal validationBalance = 0;
+
+
+                // decimal currentGCValidationValue = currentBalance;
+
+                int validationSuccessCount = 0;
+                int validationFailureCount = 0;
+
+                foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
+                {
+                    gcCount++;
+                    try
+                    {
+                        decimal currentGCValidationValue = await browser.ValidateAmazonAsync(txtUsername.Text, txtPassword.Password, gc.Code, CTSRedeemAmazon.Token);
+
+                        if (currentGCValidationValue > 0)
+                        {
+                            gc.Validated = true;
+                            validationSuccessCount++;
+                            validationBalance += currentGCValidationValue;
+                        }
+                        else
+                        {
+                            gc.Validated = false;
+                            validationFailureCount++;
+                        }
+
+
+                    }
+                    catch (OperationCanceledException ex)
+                    {
+
+                    }
+
+
+
+
+
+
+
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine(string.Format("Successful Validations: {0}/{1}", validationSuccessCount, colParsedAmazonGiftCodes.Count()));
+                sb.AppendLine(string.Format("Failed Validations: {0}/{1}", validationFailureCount, colParsedAmazonGiftCodes.Count()));
+                sb.Append(string.Format("Validated Balance: ${0}", validationBalance));
+                txtResults.Text = sb.ToString();
+            }
+            else
+            {
+                MessageBox.Show("Authentication failure.");
+            }
+
+            btnRedeem.IsEnabled = true;
+            btnValidate.IsEnabled = true;
         }
     }
 }

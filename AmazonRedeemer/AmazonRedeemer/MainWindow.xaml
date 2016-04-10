@@ -5,10 +5,10 @@
         xmlns:core="clr-namespace:Awesomium.Core;assembly=Awesomium.Core"
         xmlns:data="http://schemas.awesomium.com/winfx/data"
         Title="Amazon Redeemer"
-        
+
         Width="1460"
         Height="800">
- 
+
     <DockPanel Margin="10">
         <TabControl>
             <TabItem Header="Parse">
@@ -29,7 +29,7 @@
                                          AcceptsTab="True"
                                          HorizontalScrollBarVisibility="Auto"
                                          TextWrapping="NoWrap"
-                                         
+
                                          VerticalScrollBarVisibility="Auto" />
                                 <Button x:Name="btnParseAmazonCode"
                                         Width="75"
@@ -47,12 +47,11 @@
                                 Padding="10">
                             <StackPanel x:Name="panelLogin"
                                         Height="270"
-                                        Width="300"
-                                       >
+                                        Width="300">
                                 <Label Content="Amazon.com User Name" />
                                 <TextBox x:Name="txtUsername"
                                          Width="200"
-                                         
+
                                          HorizontalAlignment="Left" />
 
                                 <Label Margin="0,10,0,0" Content="Amazon.com Password" />
@@ -77,9 +76,9 @@
                                 <Label x:Name="lblBalance"
                                        Margin="0,10,0,0"
                                        Content="Balance: " />
-                                <TextBlock 
+                                <TextBlock
                                        Margin="0,10,0,0"
-                                       Text="When validating, Amazon prompts for a Captcha after ~10 validations" TextWrapping="Wrap" FontWeight="Bold" Foreground="Black"/>
+                                       Text="When validating, Amazon prompts for a Captcha after ~10 validations" TextWrapping="Wrap" FontWeight="Bold" Foreground="Black" />
                                 <TextBlock x:Name="txtCaptchaWarning"
                                        Margin="0,10,0,0"
                                             TextWrapping="Wrap"
@@ -134,9 +133,8 @@
                                 <Label Content="Expected $ Value of Cards (required):" />
                                 <TextBox x:Name="txtExpectedValue"
                                          Width="100"
-                                         HorizontalAlignment="Left"    
-                                         Text="0"
-                                         />
+                                         HorizontalAlignment="Left"
+                                         Text="0" />
                             </StackPanel>
                         </Border>
                         <Border Margin="10,10,0,0"
@@ -166,9 +164,9 @@
                                 CornerRadius="3"
                                 Padding="10">
                             <Canvas x:Name="browserPlaceHolder" Width="650"
-                                        
+
                                             Height="690"></Canvas>
-                            
+
                             <!--<awe:WebControl x:Name="browser"
                                             Width="508"
                                             Height="508" />-->
@@ -176,7 +174,7 @@
                     </StackPanel>
                 </StackPanel>
             </TabItem>
-            <TabItem Header="Proxy" >
+            <TabItem Header="Proxy">
                 <StackPanel>
                     <Border VerticalAlignment="Top"
                                 BorderBrush="SteelBlue"
@@ -188,18 +186,15 @@
                             <Label Content="Local Host:" />
                             <TextBox x:Name="txtLocalHost"
                                         HorizontalAlignment="Left"
-                                         Width="150"  Text="127.0.0.1"
-                                        />
+                                         Width="150"  Text="127.0.0.1" />
                             <Label Content="Local Port:" />
                             <TextBox x:Name="txtLocalPort"
                                         HorizontalAlignment="Left"
-                                         Width="150"      
-                                     Text="8080"
-                                        />
+                                         Width="150"
+                                     Text="8080" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
-
             </TabItem>
         </TabControl>
     </DockPanel>

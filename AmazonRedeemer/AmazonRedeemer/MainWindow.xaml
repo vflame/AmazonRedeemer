@@ -118,7 +118,22 @@
                                                             Header="Redeemed" />
                                         <DataGridTextColumn x:Name="cValidated"
                                                             Binding="{Binding Validated}"
-                                                            Header="Validated" />
+                                                            Header="Validated" >
+                                          
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="{x:Type TextBlock}">
+                                                        <Style.Triggers>
+                                                            <Trigger Property="Text" Value="True">
+                                                                <Setter Property="Background" Value="LightGreen"/>
+                                                            </Trigger>
+                                                        <Trigger Property="Text" Value="False">
+                                                            <Setter Property="Background" Value="Pink"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                           
+                                        </DataGridTextColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </StackPanel>

@@ -342,7 +342,8 @@
                 }
             }
 
-            txtExpectedValue.Text = colParsedAmazonGiftCodes.Sum(p => p.Value).ToString();
+
+
 
             if (colParsedAmazonGiftCodes.Count < 1)
             {
@@ -350,6 +351,26 @@
             }
             else
             {
+                txtExpectedValue.Text = colParsedAmazonGiftCodes.Sum(p => p.Value).ToString();
+
+                if (txtExpectedValue.Text == String.Empty)
+                {
+                    txtExpectedValue.Background = Brushes.Pink;
+                }
+                else
+                {
+                    decimal expectedValue = 0;
+                    decimal.TryParse(txtExpectedValue.Text, out expectedValue);
+                    if (expectedValue > 0)
+                    {
+                        txtExpectedValue.Background = Brushes.White;
+                    }
+                    else
+                    {
+                        txtExpectedValue.Background = Brushes.Pink;
+                    }
+                }
+
                 txtUnparsedAmazonCodes.Background = Brushes.White;
             }
             //txtExpectedValue.Focus();
@@ -438,7 +459,7 @@
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine(string.Format("Starting balance: ${0}", startingBalance));
                 sb.AppendLine(string.Format("Ending balance: ${0}", currentBalance));
-                sb.Append(string.Format("Value redeemed: ${0}", currentBalance - startingBalance));
+                sb.AppendLine(string.Format("Value redeemed: ${0}", currentBalance - startingBalance));
                 txtResults.Text = sb.ToString();
             }
             else
@@ -548,7 +569,7 @@
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine(string.Format("Successful Validations: {0}/{1}", validationSuccessCount, colParsedAmazonGiftCodes.Count()));
                 sb.AppendLine(string.Format("Failed Validations: {0}/{1}", validationFailureCount, colParsedAmazonGiftCodes.Count()));
-                sb.Append(string.Format("Validated Balance: ${0}", validationBalance));
+                sb.AppendLine(string.Format("Validated Balance: ${0}", validationBalance));
                 txtResults.Text = sb.ToString();
             }
             else

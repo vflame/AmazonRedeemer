@@ -16,9 +16,39 @@
     using System.Windows;
     using System.Windows.Media;
     using System.Windows.Media.Imaging;
+    using Tesseract;
+    using System.Collections.Generic;
 
     public static class Extensions
     {
+        private static KeyValuePair<float, string> SolveCaptcha_Tesseract(Bitmap image)
+        {
+
+            string result;
+            float confidence;
+            using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.TesseractAndCube))
+            {
+                // have to load Pix via a bitmap since Pix doesn't support loading a stream.
+
+                using (var pix = PixConverter.ToPix(image))
+                {
+                    using (var page = engine.Process(pix))
+                    {
+                        confidence = page.GetMeanConfidence();
+                        result = page.GetText();
+                    }
+                }
+
+            }
+
+            result = result.Replace("\r", string.Empty);
+            result = result.Replace("\n", string.Empty);
+            result = result.Replace(" ", string.Empty);
+
+            return new KeyValuePair<float, string>(confidence, result);
+        }
+
+
         public static async Task<decimal> AuthenticateToAmazonAsync(this IWebView view, string username, string password, CancellationToken ct)
         {
             string amazonLoginUrl = @"https://www.amazon.com/gc/redeem/";
@@ -123,7 +153,7 @@
 
             await view.WaitPageLoadComplete(() =>
             {
-                
+
                 view.ExecuteJavascript("document.querySelector(\"#gc-redemption-apply input\").click()");
             }, ct: ct);
 
@@ -163,8 +193,8 @@
 
             view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
 
-            int milliSecToWait = 10000;
-            int milliSecWaited = 0;
+            //int milliSecToWait = 10000;
+            //int milliSecWaited = 0;
 
             string gcValue;
             bool codeError = false;
@@ -173,12 +203,12 @@
 
             while (true)
             {
-                if (milliSecWaited > milliSecToWait)
-                {
-                    break;
-                }
-                await Task.Delay(500);
-                milliSecWaited += 500;
+                //if (milliSecWaited > milliSecToWait)
+                //{
+                //    break;
+                //}
+                //await Task.Delay(500);
+                //milliSecWaited += 500;
 
                 gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
                 codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
@@ -197,7 +227,7 @@
 
                     while (true)
                     {
-                        await Task.Delay(2000);
+                        await Task.Delay(500);
                         gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
                         codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
                         if (codeError)
@@ -208,46 +238,78 @@
 
                         if (gcValue == null || gcValue == "undefined" || gcValue == "null" || gcValue == "")
                         {
-                            await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
-                             {
-                                 ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
-                                 ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = await view.GetCaptchaData();
-                                 await captchaSolvedSignal.WaitAsync();
-
-                                 await Task.Delay(250);
-
-                                 view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text));
-
-                                 view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
-                             });
-
-                            continue;
-                        }
-
-                        string gcParsedClaimCode = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-result-box span').innerHTML").ToString()).Split()[2].ToLower();
-
-                        if (gcParsedClaimCode == claimcode.Replace("-", "").ToLower())
-                        {
-                            decimal.TryParse(gcValue.Split()[0].Replace("$", ""), out parsedValue);
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Hidden; });
-                            return parsedValue;
-                        }
-                        else
-                        {
-                            await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
+                            await Task.Delay(500);
+                            var captchaImageData = view.GetCaptchaData();
+                            var captchaResult = SolveCaptcha_Tesseract(captchaImageData.BitmapImage2Bitmap());
+                            if (captchaResult.Key < .6)
                             {
-                                ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
-                                ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = await view.GetCaptchaData();
-                                await captchaSolvedSignal.WaitAsync();
 
-                                await Task.Delay(250);
-                                view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text));
+                                await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
+                                {
 
-                                view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
-                            });
+                                    ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
+                                    ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = captchaImageData;
 
-                            continue;
+                                    await captchaSolvedSignal.WaitAsync();
+
+                                    captchaResult = new KeyValuePair<float, string>(1, ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text);
+
+                                    ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text = string.Empty;
+
+                                });
+
+                            }
+
+
+                            view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", captchaResult.Value));
+
+                            await Task.Delay(250);
+
+                            view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
+
+
+
                         }
+
+
+                        try
+                        {
+
+                            await Task.Delay(500);
+                            string gcParsedClaimCode = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-result-box span').innerHTML").ToString()).Split()[2].ToLower();
+                            gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
+
+                            if (gcParsedClaimCode == claimcode.Replace("-", "").ToLower())
+                            {
+                                decimal.TryParse(gcValue.Split()[0].Replace("$", ""), out parsedValue);
+                                Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Hidden; });
+                                return parsedValue;
+                            }
+                            else
+                            {
+
+                            }
+                        }
+                        catch (IndexOutOfRangeException ex)
+                        {
+
+                        }
+                        //else
+                        //{
+                        //    //await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
+                        //    //{
+                        //    //    ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
+                        //    //    ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = await view.GetCaptchaData();
+                        //    //    await captchaSolvedSignal.WaitAsync();
+
+                        //    //    await Task.Delay(250);
+                        //    //    view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text));
+
+                        //    //    view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
+                        //    //});
+
+                        //    //continue;
+                        //}
                     }
                 }
 
@@ -273,6 +335,7 @@
                 }
             }
 
+
             return parsedValue;
         }
 
@@ -284,7 +347,36 @@
             }
         }
 
-        public static async Task<BitmapImage> GetCaptchaData(this IWebView view)
+        private static byte[] ToByteArray(this BitmapImage bitmap)
+        {
+            byte[] data;
+            JpegBitmapEncoder encoder = new JpegBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (MemoryStream ms = new MemoryStream())
+            {
+                encoder.Save(ms);
+                data = ms.ToArray();
+            }
+            return data;
+        }
+        private static Bitmap BitmapImage2Bitmap(this BitmapImage bitmapImage)
+        {
+            // BitmapImage bitmapImage = new BitmapImage(new Uri("../Images/test.png", UriKind.Relative));
+
+            using (MemoryStream outStream = new MemoryStream())
+            {
+                BitmapEncoder enc = new BmpBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bitmapImage));
+                enc.Save(outStream);
+                System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(outStream);
+
+                return new Bitmap(bitmap);
+            }
+        }
+
+
+
+        public static BitmapImage GetCaptchaData(this IWebView view)
         {
             int top;
             int left;
@@ -436,11 +528,11 @@
                 codeCount++;
                 if (noValue)
                 {
-                    this.colParsedAmazonGiftCodes.Add(new AmazonGiftCode(codeCount, m.Groups[1].Value, null));
+                    colParsedAmazonGiftCodes.Add(new AmazonGiftCode(codeCount, m.Groups[1].Value, null));
                 }
                 else
                 {
-                    this.colParsedAmazonGiftCodes.Add(new AmazonGiftCode(codeCount, m.Groups[2].Value, decimal.Parse(m.Groups[1].Value)));
+                    colParsedAmazonGiftCodes.Add(new AmazonGiftCode(codeCount, m.Groups[2].Value, decimal.Parse(m.Groups[1].Value)));
                 }
             }
 
@@ -458,6 +550,25 @@
                 }
                 else
                 {
+
+
+                    var listDuplicateGiftCodes = colParsedAmazonGiftCodes.GroupBy(p => p.Code).Where(g => g.Count() > 1).Select(p => p.Key).ToList();
+
+
+                    if (listDuplicateGiftCodes.Count > 0)
+                    {
+                        sb = new StringBuilder();
+                        sb.AppendLine("Duplicate gift codes detected!");
+
+                        foreach (var gc in listDuplicateGiftCodes)
+                        {
+                            sb.AppendLine(gc);
+                        }
+
+                        MessageBox.Show(sb.ToString());
+                    }
+
+
                     decimal expectedValue = 0;
                     decimal.TryParse(txtExpectedValue.Text, out expectedValue);
                     if (expectedValue > 0)
@@ -483,6 +594,7 @@
                 return;
             }
 
+            
             browserPlaceHolder.Children.Clear();
             browser = new Awesomium.Windows.Controls.WebControl();
             browser.Height = browserPlaceHolder.Height;
@@ -508,6 +620,7 @@
                 MessageBox.Show(string.Format("Proxy IP: {0}", ip));
             }
 
+            btnParseAmazonCode.IsEnabled = false;
             btnRedeem.IsEnabled = false;
             btnValidate.IsEnabled = false;
 
@@ -554,6 +667,7 @@
                     catch (OperationCanceledException ex)
                     {
                     }
+                    datagridParsedAmazonCodes.ScrollIntoView(gc);
                 }
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine(string.Format("Starting balance: ${0}", startingBalance));
@@ -567,6 +681,8 @@
             }
 
             btnRedeem.IsEnabled = true;
+            btnValidate.IsEnabled = true;
+            btnParseAmazonCode.IsEnabled = true;
         }
 
         private async void btnValidate_Click(object sender, RoutedEventArgs e)
@@ -607,7 +723,8 @@
             }
 
             btnValidate.IsEnabled = false;
-            btnRedeem.IsEnabled = false;
+            btnRedeem.IsEnabled = false;         
+            btnParseAmazonCode.IsEnabled = false;
 
             CTSRedeemAmazon = new CancellationTokenSource();
             decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
@@ -660,6 +777,9 @@
                             gc.Validated = false;
                             validationFailureCount++;
                         }
+
+                        datagridParsedAmazonCodes.ScrollIntoView(gc);
+
                     }
                     catch (OperationCanceledException ex)
                     {
@@ -677,7 +797,8 @@
             }
 
             btnRedeem.IsEnabled = true;
-            btnValidate.IsEnabled = true;
+            btnValidate.IsEnabled = true;         
+            btnParseAmazonCode.IsEnabled = true;
         }
 
         private void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)

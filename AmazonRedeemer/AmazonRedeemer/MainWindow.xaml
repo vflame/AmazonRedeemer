@@ -82,7 +82,7 @@
                                 <StackPanel x:Name="CaptchaPanel" Visibility="Hidden">
                                     <TextBlock
                                        Margin="0,10,0,0"
-                                            TextWrapping="Wrap" Text="Captcha Detected. Enter Captcha and manually and submit"
+                                            TextWrapping="Wrap" Text="Low confidence in Captcha solving. Enter Captcha and manually and click submit"
                                         Foreground="Red" FontSize="14" />
                                     <Border Margin="0,5,0,0" BorderThickness="1" HorizontalAlignment="Left" BorderBrush="Black">
                                         <Image x:Name="CaptchaImage" Height="70" Width="200"></Image>
@@ -104,7 +104,7 @@
                                 <Label Content="Parsed codes:" />
                                 <DataGrid x:Name="datagridParsedAmazonCodes"
                                           Width="375"
-                                          Height="463"
+                                          Height="592"
                                           AlternatingRowBackground="Gainsboro"
                                           AlternationCount="2"
                                           AutoGenerateColumns="False"
@@ -186,7 +186,7 @@
                                 Padding="10">
                             <Canvas x:Name="browserPlaceHolder" Width="650"
 
-                                            Height="649"></Canvas>
+                                            Height="778"></Canvas>
 
                             <!--<awe:WebControl x:Name="browser"
                                             Width="508"

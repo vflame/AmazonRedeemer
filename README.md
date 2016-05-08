@@ -10,4 +10,6 @@ Enter amazon credentials
 
 Click parse
 
+Bot in action: http://i.imgur.com/WQDy29o.png
+
 Report any bugs: https://github.com/vflame/AmazonRedeemer/issues

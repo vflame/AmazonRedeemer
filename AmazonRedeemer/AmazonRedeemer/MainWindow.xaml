@@ -7,7 +7,7 @@
         Title="Amazon Redeemer"
 
         Width="1460"
-        Height="800">
+        Height="920">
 
     <DockPanel Margin="10">
         <TabControl>
@@ -46,7 +46,7 @@
                                 CornerRadius="3"
                                 Padding="10">
                             <StackPanel x:Name="panelLogin"
-                                        Height="270"
+                                        Height="400"
                                         Width="300">
                                 <Label Content="Amazon.com User Name" />
                                 <TextBox x:Name="txtUsername"
@@ -61,12 +61,12 @@
                                                  VerticalAlignment="Top"
                                                  HorizontalAlignment="Left" />
                                     <StackPanel>
-                                    <Button x:Name="btnRedeem"
+                                        <Button x:Name="btnRedeem"
                                             Width="75"
                                             Margin="20,0,0,0"
                                             Click="btnRedeem_Click"
                                             Content="Redeem" />
-                                    <Button x:Name="btnValidate"
+                                        <Button x:Name="btnValidate"
                                             Width="75"
                                             Margin="20,10,0,0"
                                             Click="btnValidate_Click"
@@ -79,10 +79,17 @@
                                 <TextBlock
                                        Margin="0,10,0,0"
                                        Text="When validating, Amazon prompts for a Captcha after ~10 validations" TextWrapping="Wrap" FontWeight="Bold" Foreground="Black" />
-                                <TextBlock x:Name="txtCaptchaWarning"
+                                <StackPanel x:Name="CaptchaPanel" Visibility="Hidden">
+                                    <TextBlock
                                        Margin="0,10,0,0"
-                                            TextWrapping="Wrap"
-                                       Text="" Foreground="Red" FontSize="14" />
+                                            TextWrapping="Wrap" Text="Captcha Detected. Enter Captcha and manually and submit"
+                                        Foreground="Red" FontSize="14" />
+                                    <Border Margin="0,5,0,0" BorderThickness="1" HorizontalAlignment="Left" BorderBrush="Black">
+                                        <Image x:Name="CaptchaImage" Height="70" Width="200"></Image>
+                                    </Border>
+                                    <TextBox  Margin="0,15,0,0" x:Name="txtCaptchaResult" Width="150" HorizontalAlignment="Left"></TextBox>
+                                    <Button Margin="0,5,0,0" HorizontalAlignment="Left" x:Name="btnSubmitCaptchaResult" Click="btnSubmitCaptchaResult_Click">Submit Captcha</Button>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -118,21 +125,20 @@
                                                             Header="Redeemed" />
                                         <DataGridTextColumn x:Name="cValidated"
                                                             Binding="{Binding Validated}"
-                                                            Header="Validated" >
-                                          
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="{x:Type TextBlock}">
-                                                        <Style.Triggers>
-                                                            <Trigger Property="Text" Value="True">
-                                                                <Setter Property="Background" Value="LightGreen"/>
-                                                            </Trigger>
+                                                            Header="Validated">
+
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="{x:Type TextBlock}">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="True">
+                                                            <Setter Property="Background" Value="LightGreen" />
+                                                        </Trigger>
                                                         <Trigger Property="Text" Value="False">
-                                                            <Setter Property="Background" Value="Pink"/>
+                                                            <Setter Property="Background" Value="Pink" />
                                                         </Trigger>
                                                     </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.ElementStyle>
-                                           
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
                                         </DataGridTextColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -180,7 +186,7 @@
                                 Padding="10">
                             <Canvas x:Name="browserPlaceHolder" Width="650"
 
-                                            Height="690"></Canvas>
+                                            Height="649"></Canvas>
 
                             <!--<awe:WebControl x:Name="browser"
                                             Width="508"

@@ -1,5 +1,4 @@
-﻿
-namespace AmazonRedeemer
+﻿namespace AmazonRedeemer
 {
     using System.Windows;
 

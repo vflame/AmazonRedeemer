@@ -1,10 +1,11 @@
 ﻿namespace AmazonRedeemer
 {
-    using System;
     using Awesomium.Core;
+    using System;
     using System.Collections.ObjectModel;
     using System.Collections.Specialized;
     using System.ComponentModel;
+    using System.Drawing;
     using System.IO;
     using System.Linq;
     using System.Text;
@@ -14,6 +15,7 @@
     using System.Web;
     using System.Windows;
     using System.Windows.Media;
+    using System.Windows.Media.Imaging;
 
     public static class Extensions
     {
@@ -97,6 +99,7 @@
             }
             return null;
         }
+
         public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string claimcode, CancellationToken ct)
         {
             string amazonCashInUrl = "https://www.amazon.com/gc/redeem/";
@@ -120,12 +123,14 @@
 
             await view.WaitPageLoadComplete(() =>
             {
-                //view.ExecuteJavascript("document.querySelector(\"input[name=applytoaccount]\").click()");
+                
                 view.ExecuteJavascript("document.querySelector(\"#gc-redemption-apply input\").click()");
             }, ct: ct);
 
             return await view.GetAmazonBalanceAsync();
         }
+
+        private static SemaphoreSlim captchaSolvedSignal = new SemaphoreSlim(0, 1);
 
         public static Uri ToUri(this string s)
         {
@@ -134,7 +139,7 @@
 
         public static async Task<decimal> ValidateAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct)
         {
-            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.GetChildOfType<System.Windows.Controls.Canvas>().Background = Brushes.Gray; });
+            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.GetChildOfType<System.Windows.Controls.Canvas>().Background = System.Windows.Media.Brushes.Gray; });
 
             string amazonValidateInUrl = "https://www.amazon.com/gc/redeem/";
 
@@ -186,6 +191,7 @@
 
                 if (captchaError)
                 {
+                    captchaSolvedSignal = new SemaphoreSlim(0, 1);
                     //  Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.IsEnabled = true; });
                     // Application.Current.MainWindow.Dispatcher.Invoke(() => { MessageBox.Show("Captcha Detected. Enter Captcha and manually click 'check'."); });
 
@@ -196,15 +202,24 @@
                         codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
                         if (codeError)
                         {
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = ""; });
+                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Hidden; });
                             return parsedValue;
                         }
 
                         if (gcValue == null || gcValue == "undefined" || gcValue == "null" || gcValue == "")
                         {
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.GetChildOfType<System.Windows.Controls.Canvas>().Background = null; });
+                            await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
+                             {
+                                 ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
+                                 ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = await view.GetCaptchaData();
+                                 await captchaSolvedSignal.WaitAsync();
 
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = "Captcha Detected. Enter Captcha and manually click 'check'."; });
+                                 await Task.Delay(250);
+
+                                 view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text));
+
+                                 view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
+                             });
 
                             continue;
                         }
@@ -214,14 +229,22 @@
                         if (gcParsedClaimCode == claimcode.Replace("-", "").ToLower())
                         {
                             decimal.TryParse(gcValue.Split()[0].Replace("$", ""), out parsedValue);
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = ""; });
+                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Hidden; });
                             return parsedValue;
                         }
                         else
                         {
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.GetChildOfType<System.Windows.Controls.Canvas>().Background = null; });
+                            await Application.Current.MainWindow.Dispatcher.Invoke(async () =>
+                            {
+                                ((MainWindow)Application.Current.MainWindow).CaptchaPanel.Visibility = Visibility.Visible;
+                                ((MainWindow)Application.Current.MainWindow).CaptchaImage.Source = await view.GetCaptchaData();
+                                await captchaSolvedSignal.WaitAsync();
 
-                            Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).txtCaptchaWarning.Text = "Captcha Detected. Enter Captcha and manually click 'check'."; });
+                                await Task.Delay(250);
+                                view.ExecuteJavascript(string.Format("document.querySelector('input[name=\"captchaInput\"]').value='{0}'", ((MainWindow)Application.Current.MainWindow).txtCaptchaResult.Text));
+
+                                view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
+                            });
 
                             continue;
                         }
@@ -252,6 +275,84 @@
 
             return parsedValue;
         }
+
+        public static void CaptchaSolved(this IWebView view)
+        {
+            if (captchaSolvedSignal != null)
+            {
+                captchaSolvedSignal.Release();
+            }
+        }
+
+        public static async Task<BitmapImage> GetCaptchaData(this IWebView view)
+        {
+            int top;
+            int left;
+            int width;
+            int height;
+
+            JSObject obj = view.ExecuteJavascriptWithResult("document.querySelector('.gc-captcha-image').getBoundingClientRect()");
+
+            left = (int)obj["left"];
+            width = (int)obj["width"];
+            top = (int)obj["top"];
+            height = (int)obj["height"];
+
+            byte[] binaryData = new byte[] { };
+
+            BitmapSurface surface = view.Surface as BitmapSurface;
+            BitmapSource bitmapSource = null;
+
+            if (surface == null)
+            {
+                try
+                {
+                    Awesomium.Windows.Controls.WebViewPresenter presenter = view.Surface as Awesomium.Windows.Controls.WebViewPresenter;
+                    bitmapSource = presenter.Image as BitmapSource;
+                }
+                catch (NullReferenceException ex)
+                {
+                }
+            }
+
+            if (bitmapSource != null)
+            {
+                using (MemoryStream outStream = new MemoryStream())
+                {
+                    BitmapEncoder enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(bitmapSource));
+                    enc.Save(outStream);
+
+                    Rectangle cropRect = new Rectangle(left, top, width, height);
+                    Bitmap src = Image.FromStream(outStream) as Bitmap;
+                    Bitmap target = new Bitmap(cropRect.Width, cropRect.Height);
+
+                    using (Graphics g = Graphics.FromImage(target))
+                    {
+                        g.DrawImage(src, new Rectangle(0, 0, target.Width, target.Height),
+                                         cropRect,
+                                         GraphicsUnit.Pixel);
+                    }
+
+                    //target.Save(@"captcha\yourfile.jpg", System.Drawing.Imaging.ImageFormat.Jpeg);
+
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        target.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                        binaryData = ms.ToArray();
+                    }
+                }
+            }
+
+            BitmapImage bitmap = new BitmapImage();
+
+            bitmap.BeginInit();
+            bitmap.StreamSource = new MemoryStream(binaryData);
+            bitmap.EndInit();
+
+            return bitmap;
+        }
+
         public static async Task<bool> WaitPageLoadComplete(this IWebView view, Action TriggerPageChangeAction, int timeOutSec = 0, CancellationToken ct = new CancellationToken())
         {
             SemaphoreSlim signal = new SemaphoreSlim(0, 1);
@@ -311,6 +412,7 @@
 
             datagridParsedAmazonCodes.ItemsSource = colParsedAmazonGiftCodes;
         }
+
         private void btnParseAmazonCode_Click(object sender, RoutedEventArgs e)
         {
             //string regex = @"USD ([$\d\.]*)[\s]*Amazon.com Gift Card claim code: ([\d\w\-]*)";
@@ -342,12 +444,9 @@
                 }
             }
 
-
-
-
             if (colParsedAmazonGiftCodes.Count < 1)
             {
-                txtUnparsedAmazonCodes.Background = Brushes.Pink;
+                txtUnparsedAmazonCodes.Background = System.Windows.Media.Brushes.Pink;
             }
             else
             {
@@ -355,7 +454,7 @@
 
                 if (txtExpectedValue.Text == String.Empty)
                 {
-                    txtExpectedValue.Background = Brushes.Pink;
+                    txtExpectedValue.Background = System.Windows.Media.Brushes.Pink;
                 }
                 else
                 {
@@ -363,15 +462,15 @@
                     decimal.TryParse(txtExpectedValue.Text, out expectedValue);
                     if (expectedValue > 0)
                     {
-                        txtExpectedValue.Background = Brushes.White;
+                        txtExpectedValue.Background = System.Windows.Media.Brushes.White;
                     }
                     else
                     {
-                        txtExpectedValue.Background = Brushes.Pink;
+                        txtExpectedValue.Background = System.Windows.Media.Brushes.Pink;
                     }
                 }
 
-                txtUnparsedAmazonCodes.Background = Brushes.White;
+                txtUnparsedAmazonCodes.Background = System.Windows.Media.Brushes.White;
             }
             //txtExpectedValue.Focus();
             //txtExpectedValue.SelectAll();
@@ -484,7 +583,7 @@
 
             var overlay = new System.Windows.Controls.Canvas() { Height = browserPlaceHolder.Height, Width = browserPlaceHolder.Width };
             overlay.Opacity = .5;
-            overlay.Background = Brushes.Gray;
+            overlay.Background = System.Windows.Media.Brushes.Gray;
 
             browserPlaceHolder.Children.Add(browser);
             browserPlaceHolder.Children.Add(overlay);
@@ -594,12 +693,13 @@
                 sw.WriteLine(sb);
             }
         }
+
         private bool ValidateInput()
         {
-            txtExpectedValue.Background = Brushes.White;
-            txtUnparsedAmazonCodes.Background = Brushes.White;
-            txtUsername.Background = Brushes.White;
-            txtPassword.Background = Brushes.White;
+            txtExpectedValue.Background = System.Windows.Media.Brushes.White;
+            txtUnparsedAmazonCodes.Background = System.Windows.Media.Brushes.White;
+            txtUsername.Background = System.Windows.Media.Brushes.White;
+            txtPassword.Background = System.Windows.Media.Brushes.White;
             bool hasUsername = false;
             bool hasPassword = false;
             bool areCodesParsed = false;
@@ -611,7 +711,7 @@
             }
             else
             {
-                txtUsername.Background = Brushes.Pink;
+                txtUsername.Background = System.Windows.Media.Brushes.Pink;
             }
 
             if (txtPassword.Password.Length > 0)
@@ -620,12 +720,12 @@
             }
             else
             {
-                txtPassword.Background = Brushes.Pink;
+                txtPassword.Background = System.Windows.Media.Brushes.Pink;
             }
 
             if (colParsedAmazonGiftCodes.Count < 1)
             {
-                txtUnparsedAmazonCodes.Background = Brushes.Pink;
+                txtUnparsedAmazonCodes.Background = System.Windows.Media.Brushes.Pink;
             }
             else
             {
@@ -641,12 +741,12 @@
                 }
                 else
                 {
-                    txtExpectedValue.Background = Brushes.Pink;
+                    txtExpectedValue.Background = System.Windows.Media.Brushes.Pink;
                 }
             }
             else
             {
-                txtExpectedValue.Background = Brushes.Pink;
+                txtExpectedValue.Background = System.Windows.Media.Brushes.Pink;
             }
 
             if (areCodesParsed && isExecptedValueParsed && hasUsername && hasPassword)
@@ -658,6 +758,7 @@
                 return false;
             }
         }
+
         public class AmazonGiftCode : INotifyPropertyChanged
         {
             private string _code;
@@ -665,6 +766,7 @@
             private bool? _redeemed = null;
             private bool? _validated = null;
             private decimal? _value;
+
             public AmazonGiftCode(int id, string code, decimal? value)
             {
                 _id = id;
@@ -733,6 +835,7 @@
                     NotifyPropertyChanged("Value");
                 }
             }
+
             private void NotifyPropertyChanged(String propertyName = "")
             {
                 if (PropertyChanged != null)
@@ -772,6 +875,11 @@
                 NotifyCollectionChangedEventArgs args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, sender, sender, IndexOf((T)sender));
                 OnCollectionChanged(args);
             }
+        }
+
+        private void btnSubmitCaptchaResult_Click(object sender, RoutedEventArgs e)
+        {
+            browser.CaptchaSolved();
         }
     }
 }

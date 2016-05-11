@@ -28,16 +28,17 @@
             float confidence;
             using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.TesseractAndCube))
             {
-                // have to load Pix via a bitmap since Pix doesn't support loading a stream.
-
-                using (var pix = PixConverter.ToPix(image))
+              
+                //using (var pix = PixConverter.ToPix(image))
+                //{
+                using (var page = engine.Process(image, PageSegMode.SingleWord))
                 {
-                    using (var page = engine.Process(pix))
-                    {
-                        confidence = page.GetMeanConfidence();
-                        result = page.GetText();
-                    }
+
+
+                    confidence = page.GetMeanConfidence();
+                    result = page.GetText();
                 }
+                //}
 
             }
 
@@ -79,7 +80,7 @@
 
                 await view.WaitPageLoadComplete(() =>
                 {
-                    view.ExecuteJavascript("document.querySelector(\"#signInSubmit-input\").click()");
+                    view.ExecuteJavascript("document.querySelector(\"#signInSubmit\").click()");
                 }, 10);
 
                 while (true)
@@ -594,7 +595,7 @@
                 return;
             }
 
-            
+
             browserPlaceHolder.Children.Clear();
             browser = new Awesomium.Windows.Controls.WebControl();
             browser.Height = browserPlaceHolder.Height;
@@ -723,7 +724,7 @@
             }
 
             btnValidate.IsEnabled = false;
-            btnRedeem.IsEnabled = false;         
+            btnRedeem.IsEnabled = false;
             btnParseAmazonCode.IsEnabled = false;
 
             CTSRedeemAmazon = new CancellationTokenSource();
@@ -797,7 +798,7 @@
             }
 
             btnRedeem.IsEnabled = true;
-            btnValidate.IsEnabled = true;         
+            btnValidate.IsEnabled = true;
             btnParseAmazonCode.IsEnabled = true;
         }
 

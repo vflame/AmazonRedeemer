@@ -1,6 +1,8 @@
 # AmazonRedeemer
 
-Download the latest release (AmazonRedeemer.7z): https://github.com/vflame/AmazonRedeemer/releases
+Visual Studio 2015 x86 & x64 Runtimes are required! https://www.microsoft.com/en-us/download/details.aspx?id=48145 get both x86 and x64
+
+Download the latest release (AmazonRedeemer.7z) and extract: https://github.com/vflame/AmazonRedeemer/releases
 
 Run the amazonredeemer.exe (has amazon icon)
 

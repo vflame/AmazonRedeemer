@@ -28,7 +28,7 @@
             float confidence;
             using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.TesseractAndCube))
             {
-              
+
                 //using (var pix = PixConverter.ToPix(image))
                 //{
                 using (var page = engine.Process(image, PageSegMode.SingleWord))
@@ -597,93 +597,96 @@
 
 
             browserPlaceHolder.Children.Clear();
-            browser = new Awesomium.Windows.Controls.WebControl();
-            browser.Height = browserPlaceHolder.Height;
-            browser.Width = browserPlaceHolder.Width;
-
-            browserPlaceHolder.Children.Add(browser);
-
-            if (cbUseSSHProxy.IsChecked == true)
+            using (browser = new Awesomium.Windows.Controls.WebControl())
             {
-                browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
+                browser.Height = browserPlaceHolder.Height;
+                browser.Width = browserPlaceHolder.Width;
+
+                browserPlaceHolder.Children.Add(browser);
+
+                if (cbUseSSHProxy.IsChecked == true)
                 {
-                    Plugins = false,
-                    ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
-                });
-
-                await browser.WaitPageLoadComplete(() =>
-                {
-                    browser.Source = "api.ipify.org".ToUri();
-                });
-
-                string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
-
-                MessageBox.Show(string.Format("Proxy IP: {0}", ip));
-            }
-
-            btnParseAmazonCode.IsEnabled = false;
-            btnRedeem.IsEnabled = false;
-            btnValidate.IsEnabled = false;
-
-            //await browser.WaitPageLoadComplete(() =>
-            //{
-            //    browser.Source = "amazon.com".ToUri();
-            //});
-
-            CTSRedeemAmazon = new CancellationTokenSource();
-            decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
-
-            if (currentBalance > -1)
-            {
-                lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
-
-                int gcCount = 0;
-
-                decimal previousBalance = currentBalance;
-
-                decimal startingBalance = currentBalance;
-
-                foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
-                {
-                    try
+                    browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
                     {
-                        gcCount++;
+                        Plugins = false,
+                        ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
+                    });
 
-                        currentBalance = await browser.RedeemAmazonAsync(gc.Code, CTSRedeemAmazon.Token);
-
-                        lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
-
-                        if (currentBalance > previousBalance)
-                        {
-                            gc.Redeemed = true;
-                            gc.Validated = true;
-                            gc.Value = (currentBalance - previousBalance);
-                            previousBalance = currentBalance;
-                        }
-                        else
-                        {
-                            gc.Redeemed = false;
-                        }
-                    }
-                    catch (OperationCanceledException ex)
+                    await browser.WaitPageLoadComplete(() =>
                     {
-                    }
-                    datagridParsedAmazonCodes.ScrollIntoView(gc);
+                        browser.Source = "api.ipify.org".ToUri();
+                    });
+
+                    string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
+
+                    MessageBox.Show(string.Format("Proxy IP: {0}", ip));
                 }
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine(string.Format("Starting balance: ${0}", startingBalance));
-                sb.AppendLine(string.Format("Ending balance: ${0}", currentBalance));
-                sb.AppendLine(string.Format("Value redeemed: ${0}", currentBalance - startingBalance));
-                txtResults.Text = sb.ToString();
-            }
-            else
-            {
-                MessageBox.Show("Authentication failure.");
-            }
 
-            btnRedeem.IsEnabled = true;
-            btnValidate.IsEnabled = true;
-            btnParseAmazonCode.IsEnabled = true;
+                btnParseAmazonCode.IsEnabled = false;
+                btnRedeem.IsEnabled = false;
+                btnValidate.IsEnabled = false;
+
+                //await browser.WaitPageLoadComplete(() =>
+                //{
+                //    browser.Source = "amazon.com".ToUri();
+                //});
+
+                CTSRedeemAmazon = new CancellationTokenSource();
+                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
+
+                if (currentBalance > -1)
+                {
+                    lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
+
+                    int gcCount = 0;
+
+                    decimal previousBalance = currentBalance;
+
+                    decimal startingBalance = currentBalance;
+
+                    foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
+                    {
+                        try
+                        {
+                            gcCount++;
+
+                            currentBalance = await browser.RedeemAmazonAsync(gc.Code, CTSRedeemAmazon.Token);
+
+                            lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
+
+                            if (currentBalance > previousBalance)
+                            {
+                                gc.Redeemed = true;
+                                gc.Validated = true;
+                                gc.Value = (currentBalance - previousBalance);
+                                previousBalance = currentBalance;
+                            }
+                            else
+                            {
+                                gc.Redeemed = false;
+                            }
+                        }
+                        catch (OperationCanceledException ex)
+                        {
+                        }
+                        datagridParsedAmazonCodes.ScrollIntoView(gc);
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine(string.Format("Starting balance: ${0}", startingBalance));
+                    sb.AppendLine(string.Format("Ending balance: ${0}", currentBalance));
+                    sb.AppendLine(string.Format("Value redeemed: ${0}", currentBalance - startingBalance));
+                    txtResults.Text = sb.ToString();
+                }
+                else
+                {
+                    MessageBox.Show("Authentication failure.");
+                }
+
+                btnRedeem.IsEnabled = true;
+                btnValidate.IsEnabled = true;
+                btnParseAmazonCode.IsEnabled = true;
+            }
+            browserPlaceHolder.Children.Clear();
         }
 
         private async void btnValidate_Click(object sender, RoutedEventArgs e)
@@ -694,112 +697,115 @@
             }
 
             browserPlaceHolder.Children.Clear();
-            browser = new Awesomium.Windows.Controls.WebControl();
-            browser.Height = browserPlaceHolder.Height;
-            browser.Width = browserPlaceHolder.Width;
-
-            var overlay = new System.Windows.Controls.Canvas() { Height = browserPlaceHolder.Height, Width = browserPlaceHolder.Width };
-            overlay.Opacity = .5;
-            overlay.Background = System.Windows.Media.Brushes.Gray;
-
-            browserPlaceHolder.Children.Add(browser);
-            browserPlaceHolder.Children.Add(overlay);
-
-            if (cbUseSSHProxy.IsChecked == true)
+            using (browser = new Awesomium.Windows.Controls.WebControl())
             {
-                browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
+                browser.Height = browserPlaceHolder.Height;
+                browser.Width = browserPlaceHolder.Width;
+
+                var overlay = new System.Windows.Controls.Canvas() { Height = browserPlaceHolder.Height, Width = browserPlaceHolder.Width };
+                overlay.Opacity = .5;
+                overlay.Background = System.Windows.Media.Brushes.Gray;
+
+                browserPlaceHolder.Children.Add(browser);
+                browserPlaceHolder.Children.Add(overlay);
+
+                if (cbUseSSHProxy.IsChecked == true)
                 {
-                    Plugins = false,
-                    ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
-                });
-
-                await browser.WaitPageLoadComplete(() =>
-                {
-                    browser.Source = "api.ipify.org".ToUri();
-                });
-
-                string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
-
-                MessageBox.Show(string.Format("Proxy IP: {0}", ip));
-            }
-
-            btnValidate.IsEnabled = false;
-            btnRedeem.IsEnabled = false;
-            btnParseAmazonCode.IsEnabled = false;
-
-            CTSRedeemAmazon = new CancellationTokenSource();
-            decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
-
-            if (currentBalance > -1)
-            {
-                lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
-
-                int gcCount = 0;
-
-                decimal validationBalance = 0;
-
-                int validationSuccessCount = 0;
-                int validationFailureCount = 0;
-
-                foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
-                {
-                    gcCount++;
-                    try
+                    browser.WebSession = WebCore.CreateWebSession(new WebPreferences()
                     {
-                        decimal currentGCValidationValue = await browser.ValidateAmazonAsync(txtUsername.Text, txtPassword.Password, gc.Code, CTSRedeemAmazon.Token);
+                        Plugins = false,
+                        ProxyConfig = string.Format("socks4://{0}:{1}", txtLocalHost.Text, txtLocalPort.Text)
+                    });
 
-                        if (currentGCValidationValue > 0)
+                    await browser.WaitPageLoadComplete(() =>
+                    {
+                        browser.Source = "api.ipify.org".ToUri();
+                    });
+
+                    string ip = Regex.Match(browser.HTML, ValidIpAddressRegex).Value;
+
+                    MessageBox.Show(string.Format("Proxy IP: {0}", ip));
+                }
+
+                btnValidate.IsEnabled = false;
+                btnRedeem.IsEnabled = false;
+                btnParseAmazonCode.IsEnabled = false;
+
+                CTSRedeemAmazon = new CancellationTokenSource();
+                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
+
+                if (currentBalance > -1)
+                {
+                    lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
+
+                    int gcCount = 0;
+
+                    decimal validationBalance = 0;
+
+                    int validationSuccessCount = 0;
+                    int validationFailureCount = 0;
+
+                    foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
+                    {
+                        gcCount++;
+                        try
                         {
-                            if (gc.Value == null)
-                            {
-                                gc.Value = currentGCValidationValue;
+                            decimal currentGCValidationValue = await browser.ValidateAmazonAsync(txtUsername.Text, txtPassword.Password, gc.Code, CTSRedeemAmazon.Token);
 
-                                gc.Validated = true;
-                                validationSuccessCount++;
-                                validationBalance += currentGCValidationValue;
-                            }
-                            else
+                            if (currentGCValidationValue > 0)
                             {
-                                if (gc.Value == currentGCValidationValue)
+                                if (gc.Value == null)
                                 {
+                                    gc.Value = currentGCValidationValue;
+
                                     gc.Validated = true;
                                     validationSuccessCount++;
                                     validationBalance += currentGCValidationValue;
                                 }
                                 else
                                 {
-                                    gc.Validated = false;
-                                    validationFailureCount++;
+                                    if (gc.Value == currentGCValidationValue)
+                                    {
+                                        gc.Validated = true;
+                                        validationSuccessCount++;
+                                        validationBalance += currentGCValidationValue;
+                                    }
+                                    else
+                                    {
+                                        gc.Validated = false;
+                                        validationFailureCount++;
+                                    }
                                 }
                             }
+                            else
+                            {
+                                gc.Validated = false;
+                                validationFailureCount++;
+                            }
+
+                            datagridParsedAmazonCodes.ScrollIntoView(gc);
+
                         }
-                        else
+                        catch (OperationCanceledException ex)
                         {
-                            gc.Validated = false;
-                            validationFailureCount++;
                         }
-
-                        datagridParsedAmazonCodes.ScrollIntoView(gc);
-
                     }
-                    catch (OperationCanceledException ex)
-                    {
-                    }
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine(string.Format("Successful Validations: {0}/{1}", validationSuccessCount, colParsedAmazonGiftCodes.Count()));
+                    sb.AppendLine(string.Format("Failed Validations: {0}/{1}", validationFailureCount, colParsedAmazonGiftCodes.Count()));
+                    sb.AppendLine(string.Format("Validated Balance: ${0}", validationBalance));
+                    txtResults.Text = sb.ToString();
                 }
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine(string.Format("Successful Validations: {0}/{1}", validationSuccessCount, colParsedAmazonGiftCodes.Count()));
-                sb.AppendLine(string.Format("Failed Validations: {0}/{1}", validationFailureCount, colParsedAmazonGiftCodes.Count()));
-                sb.AppendLine(string.Format("Validated Balance: ${0}", validationBalance));
-                txtResults.Text = sb.ToString();
-            }
-            else
-            {
-                MessageBox.Show("Authentication failure.");
-            }
+                else
+                {
+                    MessageBox.Show("Authentication failure.");
+                }
 
-            btnRedeem.IsEnabled = true;
-            btnValidate.IsEnabled = true;
-            btnParseAmazonCode.IsEnabled = true;
+                btnRedeem.IsEnabled = true;
+                btnValidate.IsEnabled = true;
+                btnParseAmazonCode.IsEnabled = true;
+            }
+            browserPlaceHolder.Children.Clear();
         }
 
         private void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)
@@ -1002,6 +1008,20 @@
         private void btnSubmitCaptchaResult_Click(object sender, RoutedEventArgs e)
         {
             browser.CaptchaSolved();
+        }
+
+        private async void btnCheckIpAddress_Click(object sender, RoutedEventArgs e)
+        {
+            // browser = new Awesomium.Windows.Controls.WebControl();
+            btnCheckIpAddress.IsEnabled = false;
+
+            using (Awesomium.Core.IWebView tempView = WebCore.CreateWebView(0, 0))
+            {
+                await tempView.WaitPageLoadComplete(() => { tempView.Source = "api.ipify.org".ToUri(); });
+                string ipAddress = tempView.ExecuteJavascriptWithResult("document.body.textContent");
+                MessageBox.Show(string.Format("Reported IP Address [ipify.org]: {0}", ipAddress));
+            }
+            btnCheckIpAddress.IsEnabled = true;
         }
     }
 }

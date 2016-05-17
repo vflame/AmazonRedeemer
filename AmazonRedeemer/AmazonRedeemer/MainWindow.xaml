@@ -71,6 +71,11 @@
                                             Margin="20,10,0,0"
                                             Click="btnValidate_Click"
                                             Content="Validate Only" />
+                                        <Button x:Name="btnCheckIpAddress"
+                                            Width="75"
+                                            Margin="20,10,0,0"
+                                            Click="btnCheckIpAddress_Click"
+                                            Content="Check IP" />
                                     </StackPanel>
                                 </StackPanel>
                                 <Label x:Name="lblBalance"

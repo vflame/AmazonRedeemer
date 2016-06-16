@@ -131,7 +131,7 @@
             return null;
         }
 
-        public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string claimcode, CancellationToken ct)
+        public static async Task<decimal> RedeemAmazonAsync(this IWebView view, string claimcode, CancellationToken ct, int delayMS)
         {
             string amazonCashInUrl = "https://www.amazon.com/gc/redeem/";
 
@@ -154,9 +154,10 @@
 
             await view.WaitPageLoadComplete(() =>
             {
-
                 view.ExecuteJavascript("document.querySelector(\"#gc-redemption-apply input\").click()");
             }, ct: ct);
+
+            await Task.Delay(delayMS);
 
             return await view.GetAmazonBalanceAsync();
         }
@@ -168,7 +169,7 @@
             return new UriBuilder(s).Uri;
         }
 
-        public static async Task<decimal> ValidateAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct)
+        public static async Task<decimal> ValidateAmazonAsync(this IWebView view, string username, string password, string claimcode, CancellationToken ct, int delayMS)
         {
             Application.Current.MainWindow.Dispatcher.Invoke(() => { ((MainWindow)Application.Current.MainWindow).browserPlaceHolder.GetChildOfType<System.Windows.Controls.Canvas>().Background = System.Windows.Media.Brushes.Gray; });
 
@@ -194,8 +195,7 @@
 
             view.ExecuteJavascript("document.querySelector('#gc-redemption-check-value input').click()");
 
-            //int milliSecToWait = 10000;
-            //int milliSecWaited = 0;
+            await Task.Delay(delayMS);
 
             string gcValue;
             bool codeError = false;
@@ -204,13 +204,6 @@
 
             while (true)
             {
-                //if (milliSecWaited > milliSecToWait)
-                //{
-                //    break;
-                //}
-                //await Task.Delay(500);
-                //milliSecWaited += 500;
-
                 gcValue = HttpUtility.HtmlDecode(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-check-value-heading').innerHTML").ToString());
                 codeError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-error') ? (document.querySelector('#gc-redemption-error').innerHTML.toLowerCase().indexOf('claim code is invalid')>-1 ? true : false) : false").ToString());
                 captchaError = bool.Parse(view.ExecuteJavascriptWithResult("document.querySelector('#gc-redemption-captcha') ? (document.querySelector('#gc-redemption-captcha').innerHTML.toLowerCase().indexOf('security verification')>-1 ? true : false) : false").ToString());
@@ -241,7 +234,7 @@
                         {
                             await Task.Delay(500);
                             var captchaImageData = view.GetCaptchaData();
-                            var captchaResult = SolveCaptcha_Tesseract(captchaImageData.BitmapImage2Bitmap());
+                            var captchaResult = SolveCaptcha_Tesseract(captchaImageData.BitmapImageToBitmap());
                             if (captchaResult.Key < .6)
                             {
 
@@ -316,6 +309,11 @@
 
                 if (gcValue == null || gcValue == "undefined" || gcValue == "null" || gcValue == "")
                 {
+                    //await view.WaitPageLoadComplete(() =>
+                    //{
+                    //    view.Reload(false);
+                    //});
+                    await Task.Delay(delayMS);
                     continue;
                 }
                 else
@@ -360,7 +358,7 @@
             }
             return data;
         }
-        private static Bitmap BitmapImage2Bitmap(this BitmapImage bitmapImage)
+        private static Bitmap BitmapImageToBitmap(this BitmapImage bitmapImage)
         {
             // BitmapImage bitmapImage = new BitmapImage(new Uri("../Images/test.png", UriKind.Relative));
 
@@ -375,7 +373,46 @@
             }
         }
 
+        public static BitmapSource CreateBitmapFromVisual(Visual target)
+        {
+            if (target == null)
+            {
+                return null;
+            }
 
+            System.Windows.Rect bounds = VisualTreeHelper.GetDescendantBounds(target);
+
+            RenderTargetBitmap renderTarget = new RenderTargetBitmap((Int32)bounds.Width, (Int32)bounds.Height, 96, 96, PixelFormats.Pbgra32);
+
+            DrawingVisual visual = new DrawingVisual();
+
+            using (DrawingContext context = visual.RenderOpen())
+            {
+                VisualBrush visualBrush = new VisualBrush(target);
+                context.DrawRectangle(visualBrush, null, new System.Windows.Rect(new System.Windows.Point(), bounds.Size));
+            }
+
+            renderTarget.Render(visual);
+            PngBitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+            bitmapEncoder.Frames.Add(BitmapFrame.Create(renderTarget));
+            using (Stream stream = new MemoryStream())
+            {
+                bitmapEncoder.Save(stream);
+                var bitmap = new Bitmap(stream);
+
+
+                var bitmapData = bitmap.LockBits(
+                        new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                        System.Drawing.Imaging.ImageLockMode.ReadOnly, bitmap.PixelFormat);
+
+                var bitmapSource = BitmapSource.Create(
+                    bitmapData.Width, bitmapData.Height, 96, 96, PixelFormats.Bgra32, null,
+                    bitmapData.Scan0, bitmapData.Stride * bitmapData.Height, bitmapData.Stride);
+
+                bitmap.UnlockBits(bitmapData);
+                return bitmapSource;
+            }
+        }
 
         public static BitmapImage GetCaptchaData(this IWebView view)
         {
@@ -632,7 +669,7 @@
                 //});
 
                 CTSRedeemAmazon = new CancellationTokenSource();
-                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
+                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtAmazonUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
 
                 if (currentBalance > -1)
                 {
@@ -644,13 +681,16 @@
 
                     decimal startingBalance = currentBalance;
 
+                    int delayMS = string.IsNullOrWhiteSpace(txtDelayMS.Text) ? 0 : int.Parse(txtDelayMS.Text);
+
                     foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
                     {
                         try
                         {
                             gcCount++;
 
-                            currentBalance = await browser.RedeemAmazonAsync(gc.Code, CTSRedeemAmazon.Token);
+
+                            currentBalance = await browser.RedeemAmazonAsync(gc.Code, CTSRedeemAmazon.Token, delayMS);
 
                             lblBalance.Content = string.Format("Balance: {0}", currentBalance.ToString("C"));
 
@@ -732,7 +772,7 @@
                 btnParseAmazonCode.IsEnabled = false;
 
                 CTSRedeemAmazon = new CancellationTokenSource();
-                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
+                decimal currentBalance = await browser.AuthenticateToAmazonAsync(txtAmazonUsername.Text, txtPassword.Password, CTSRedeemAmazon.Token);
 
                 if (currentBalance > -1)
                 {
@@ -745,12 +785,14 @@
                     int validationSuccessCount = 0;
                     int validationFailureCount = 0;
 
+                    int delayMS = string.IsNullOrWhiteSpace(txtDelayMS.Text) ? 0 : int.Parse(txtDelayMS.Text);
+
                     foreach (AmazonGiftCode gc in colParsedAmazonGiftCodes)
                     {
                         gcCount++;
                         try
                         {
-                            decimal currentGCValidationValue = await browser.ValidateAmazonAsync(txtUsername.Text, txtPassword.Password, gc.Code, CTSRedeemAmazon.Token);
+                            decimal currentGCValidationValue = await browser.ValidateAmazonAsync(txtAmazonUsername.Text, txtPassword.Password, gc.Code, CTSRedeemAmazon.Token, delayMS);
 
                             if (currentGCValidationValue > 0)
                             {
@@ -826,20 +868,20 @@
         {
             txtExpectedValue.Background = System.Windows.Media.Brushes.White;
             txtUnparsedAmazonCodes.Background = System.Windows.Media.Brushes.White;
-            txtUsername.Background = System.Windows.Media.Brushes.White;
+            txtAmazonUsername.Background = System.Windows.Media.Brushes.White;
             txtPassword.Background = System.Windows.Media.Brushes.White;
             bool hasUsername = false;
             bool hasPassword = false;
             bool areCodesParsed = false;
             bool isExecptedValueParsed = false;
 
-            if (txtUsername.Text.Length > 0)
+            if (txtAmazonUsername.Text.Length > 0)
             {
                 hasUsername = true;
             }
             else
             {
-                txtUsername.Background = System.Windows.Media.Brushes.Pink;
+                txtAmazonUsername.Background = System.Windows.Media.Brushes.Pink;
             }
 
             if (txtPassword.Password.Length > 0)
@@ -1023,5 +1065,21 @@
             }
             btnCheckIpAddress.IsEnabled = true;
         }
+
+        private void btnScreenshot_Click(object sender, RoutedEventArgs e)
+        {
+            txtAmazonUsername.Text = string.Empty;
+            Clipboard.SetImage(Extensions.CreateBitmapFromVisual(this));
+
+
+        }
+
+        private void txtDelayMS_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            Regex regex = new Regex("[^0-9]+");
+            e.Handled = regex.IsMatch(e.Text);
+        }
+
+
     }
 }

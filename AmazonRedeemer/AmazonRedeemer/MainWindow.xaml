@@ -5,7 +5,6 @@
         xmlns:core="clr-namespace:Awesomium.Core;assembly=Awesomium.Core"
         xmlns:data="http://schemas.awesomium.com/winfx/data"
         Title="Amazon Redeemer"
-
         Width="1460"
         Height="920">
 
@@ -29,7 +28,6 @@
                                          AcceptsTab="True"
                                          HorizontalScrollBarVisibility="Auto"
                                          TextWrapping="NoWrap"
-
                                          VerticalScrollBarVisibility="Auto" />
                                 <Button x:Name="btnParseAmazonCode"
                                         Width="75"
@@ -46,54 +44,83 @@
                                 CornerRadius="3"
                                 Padding="10">
                             <StackPanel x:Name="panelLogin"
-                                        Height="400"
-                                        Width="300">
+                                        Width="300"
+                                        Height="400">
                                 <Label Content="Amazon.com User Name" />
-                                <TextBox x:Name="txtUsername"
+                                <TextBox x:Name="txtAmazonUsername"
                                          Width="200"
-
                                          HorizontalAlignment="Left" />
 
                                 <Label Margin="0,10,0,0" Content="Amazon.com Password" />
                                 <StackPanel Orientation="Horizontal">
                                     <PasswordBox x:Name="txtPassword"
                                                  Width="200"
-                                                 VerticalAlignment="Top"
-                                                 HorizontalAlignment="Left" />
-                                    <StackPanel>
-                                        <Button x:Name="btnRedeem"
+                                                 HorizontalAlignment="Left"
+                                                 VerticalAlignment="Top" />
+
+                                </StackPanel>
+                                <StackPanel Margin="0,20,0,0" HorizontalAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Label>Delay(ms):</Label>
+                                        <TextBox x:Name="txtDelayMS" Width="50" VerticalAlignment="Center" PreviewTextInput="txtDelayMS_PreviewTextInput" Text="1250" />
+                                    </StackPanel>
+                                    <Button x:Name="btnRedeem"
                                             Width="75"
-                                            Margin="20,0,0,0"
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Left"
                                             Click="btnRedeem_Click"
                                             Content="Redeem" />
-                                        <Button x:Name="btnValidate"
+                                    <Button x:Name="btnValidate"
                                             Width="75"
-                                            Margin="20,10,0,0"
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Left"
                                             Click="btnValidate_Click"
                                             Content="Validate Only" />
-                                        <Button x:Name="btnCheckIpAddress"
+                                    <Button x:Name="btnCheckIpAddress"
                                             Width="75"
-                                            Margin="20,10,0,0"
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Left"
                                             Click="btnCheckIpAddress_Click"
                                             Content="Check IP" />
-                                    </StackPanel>
+                                    <Button x:Name="btnScreenshot"
+                                            Width="125"
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Left"
+                                            Click="btnScreenshot_Click"
+                                            Content="Screenshot (clipboard)" />
                                 </StackPanel>
                                 <Label x:Name="lblBalance"
                                        Margin="0,10,0,0"
                                        Content="Balance: " />
-                                <TextBlock
-                                       Margin="0,10,0,0"
-                                       Text="When validating, Amazon prompts for a Captcha after ~10 validations" TextWrapping="Wrap" FontWeight="Bold" Foreground="Black" />
+                                <TextBlock Margin="0,10,0,0"
+                                           FontWeight="Bold"
+                                           Foreground="Black"
+                                           Text="When validating, Amazon prompts for a Captcha after ~10 validations"
+                                           TextWrapping="Wrap" />
                                 <StackPanel x:Name="CaptchaPanel" Visibility="Hidden">
-                                    <TextBlock
-                                       Margin="0,10,0,0"
-                                            TextWrapping="Wrap" Text="Low confidence in Captcha solving. Enter Captcha and manually and click submit"
-                                        Foreground="Red" FontSize="14" />
-                                    <Border Margin="0,5,0,0" BorderThickness="1" HorizontalAlignment="Left" BorderBrush="Black">
-                                        <Image x:Name="CaptchaImage" Height="70" Width="200"></Image>
+                                    <TextBlock Margin="0,10,0,0"
+                                               FontSize="14"
+                                               Foreground="Red"
+                                               Text="Low confidence in Captcha solving. Enter Captcha and manually and click submit"
+                                               TextWrapping="Wrap" />
+                                    <Border Margin="0,5,0,0"
+                                            HorizontalAlignment="Left"
+                                            BorderBrush="Black"
+                                            BorderThickness="1">
+                                        <Image x:Name="CaptchaImage"
+                                               Width="200"
+                                               Height="70" />
                                     </Border>
-                                    <TextBox  Margin="0,15,0,0" x:Name="txtCaptchaResult" Width="150" HorizontalAlignment="Left"></TextBox>
-                                    <Button Margin="0,5,0,0" HorizontalAlignment="Left" x:Name="btnSubmitCaptchaResult" Click="btnSubmitCaptchaResult_Click">Submit Captcha</Button>
+                                    <TextBox x:Name="txtCaptchaResult"
+                                             Width="150"
+                                             Margin="0,15,0,0"
+                                             HorizontalAlignment="Left" />
+                                    <Button x:Name="btnSubmitCaptchaResult"
+                                            Margin="0,5,0,0"
+                                            HorizontalAlignment="Left"
+                                            Click="btnSubmitCaptchaResult_Click">
+                                        Submit Captcha
+                                    </Button>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -189,9 +216,9 @@
                                 BorderThickness="1"
                                 CornerRadius="3"
                                 Padding="10">
-                            <Canvas x:Name="browserPlaceHolder" Width="650"
-
-                                            Height="778"></Canvas>
+                            <Canvas x:Name="browserPlaceHolder"
+                                    Width="650"
+                                    Height="778" />
 
                             <!--<awe:WebControl x:Name="browser"
                                             Width="508"
@@ -203,20 +230,21 @@
             <TabItem Header="Proxy">
                 <StackPanel>
                     <Border VerticalAlignment="Top"
-                                BorderBrush="SteelBlue"
-                                BorderThickness="1"
-                                CornerRadius="3"
-                                Padding="10">
+                            BorderBrush="SteelBlue"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="10">
                         <StackPanel>
-                            <CheckBox x:Name="cbUseSSHProxy" Content="Use SSH proxy"></CheckBox>
+                            <CheckBox x:Name="cbUseSSHProxy" Content="Use SSH proxy" />
                             <Label Content="Local Host:" />
                             <TextBox x:Name="txtLocalHost"
-                                        HorizontalAlignment="Left"
-                                         Width="150"  Text="127.0.0.1" />
+                                     Width="150"
+                                     HorizontalAlignment="Left"
+                                     Text="127.0.0.1" />
                             <Label Content="Local Port:" />
                             <TextBox x:Name="txtLocalPort"
-                                        HorizontalAlignment="Left"
-                                         Width="150"
+                                     Width="150"
+                                     HorizontalAlignment="Left"
                                      Text="8080" />
                         </StackPanel>
                     </Border>
